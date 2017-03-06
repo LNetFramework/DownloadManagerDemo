@@ -24,20 +24,21 @@ public class DownloadActivity extends AppCompatActivity {
     private Button mBtnStart;
 
     private DownloadManager mDownloadManager;
-    private DownloadManager.Request mRequest;
+    private DownloadManager.Request mDownloadManagerRequest;
     public static final String DOWNLOAD_URL = "http://ucdl.25pp.com/fs08/2017/01/20/2/2_87a290b5f041a8b512f0bc51595f839a.apk";
     private Timer mTimer;
     private TimerTask mTimerTask;
     private long mDownLoadID;
+    private boolean isDownLoadStart;
     private Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             Bundle bundle = msg.getData();
-            int pro = bundle.getInt("pro");
+            int pct = bundle.getInt("pct");
             String name = bundle.getString("name");
-            mPbUpdate.setProgress(pro);
-            mTvProgress.setText(String.valueOf(pro) + "%");
+            mPbUpdate.setProgress(pct);
+            mTvProgress.setText(String.valueOf(pct) + "%");
             mTvFileName.setText(name);
         }
     };
@@ -48,29 +49,33 @@ public class DownloadActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         initViews();
 
+        initDownloadManager();
+    }
+
+    private void initDownloadManager() {
         mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        mRequest = new DownloadManager.Request(Uri.parse(DOWNLOAD_URL));
+        mDownloadManagerRequest = new DownloadManager.Request(Uri.parse(DOWNLOAD_URL));
 
         //设置Notification标题和描述
-        mRequest.setTitle("标题");
-        mRequest.setDescription("描述");
-        mRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        mDownloadManagerRequest.setTitle("标题");
+        mDownloadManagerRequest.setDescription("描述");
+        mDownloadManagerRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
         //指定网络下载类型
         //指定在WIFI状态下，执行下载操作。
-        mRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
+        mDownloadManagerRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
         //指定在MOBILE状态下，执行下载操作
-//        mRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE);
+//        mDownloadManagerRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE);
         //是否允许漫游状态下，执行下载操作
-        mRequest.setAllowedOverRoaming(true);
+        mDownloadManagerRequest.setAllowedOverRoaming(true);
         //是否允许“计量式的网络连接”执行下载操作
-        mRequest.setAllowedOverMetered(true); //默认是允许的。
+        mDownloadManagerRequest.setAllowedOverMetered(true); //默认是允许的。
         //设置下载文件类型
-        mRequest.setMimeType("application/vnd.android.package-archive");
+        mDownloadManagerRequest.setMimeType("application/vnd.android.package-archive");
 
         //创建目录
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).mkdir();
-        mRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "testApp.apk");
+        mDownloadManagerRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "testApp.apk");
 
         final DownloadManager.Query query = new DownloadManager.Query();
         mTimer = new Timer();
@@ -87,10 +92,10 @@ public class DownloadActivity extends AppCompatActivity {
                     String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                     int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                     int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                    int pro = (bytes_downloaded * 100) / bytes_total;
+                    int pct = (bytes_downloaded * 100) / bytes_total;
                     Message msg = Message.obtain();
                     Bundle bundle = new Bundle();
-                    bundle.putInt("pro", pro);
+                    bundle.putInt("pct", pct);
                     bundle.putString("name", title);
                     msg.setData(bundle);
                     handler.sendMessage(msg);
@@ -98,7 +103,6 @@ public class DownloadActivity extends AppCompatActivity {
                 cursor.close();
             }
         };
-        mTimer.schedule(mTimerTask, 0, 1000);
     }
 
     private void initViews() {
@@ -110,8 +114,8 @@ public class DownloadActivity extends AppCompatActivity {
         mBtnStart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                mDownLoadID = mDownloadManager.enqueue(mRequest);
-                mTimerTask.run();
+                mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
+                mTimer.schedule(mTimerTask, 0, 1000);
                 mBtnStart.setClickable(false);
             }
         });
