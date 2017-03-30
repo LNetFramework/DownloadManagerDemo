@@ -1,9 +1,9 @@
 package com.lewish.start.downloadmanagerdemo;
 
 /**
- * Created by Lewish on 2017/3/30.
+ * author: sundong
+ * created at 2017/3/30 22:03
  */
-
 public class DLManagerConfig {
 
     private static final int DEFAULT_QUERY_INTERVAL = 1000;
