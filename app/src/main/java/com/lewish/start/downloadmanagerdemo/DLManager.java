@@ -83,6 +83,12 @@ public class DLManager {
                 if (cursor != null && cursor.moveToFirst()) {
                     if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
 //                        install(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/"+FILE_NAME);
+                        mDeliveryHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                mDownLoadListener.onProgressUpdate(100);
+                            }
+                        });
                         mTimerTask.cancel();
                     }
                     String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
@@ -120,8 +126,10 @@ public class DLManager {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)) {
-                mTimer.cancel();
-                mTimer = null;
+//                mTimer.cancel();
+//                mTimer = null;
+//                mTimerTask.cancel();
+//                mTimerTask = null;
                 //下载完成
                 if(mDownLoadListener!=null) {
                     mDownLoadListener.onComplete();
