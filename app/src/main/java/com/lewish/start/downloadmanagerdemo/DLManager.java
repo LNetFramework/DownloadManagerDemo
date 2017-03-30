@@ -104,17 +104,6 @@ public class DLManager {
         public void run() {
             Cursor cursor = downloadManager.query(query.setFilterById(downloadID));
             if (cursor != null && cursor.moveToFirst()) {
-                if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
-//                        install(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/"+FILE_NAME);
-                    deliveryHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            downLoadListener.onProgressUpdate(100);
-                        }
-                    });
-                    this.cancel();
-                }
-
                 String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
                 String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                 int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
