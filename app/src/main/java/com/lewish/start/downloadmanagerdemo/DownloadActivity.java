@@ -10,6 +10,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+
 public class DownloadActivity extends AppCompatActivity {
 
 //    private DownloadBroadcastReceiver mDownloadBroadcastReceiver;
@@ -34,25 +36,32 @@ public class DownloadActivity extends AppCompatActivity {
 
         mBtnStart.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
-                DLManager.getInstance().initDLManager(DownloadActivity.this);
-                DLManager.getInstance().download(new DLManager.DownLoadListener() {
-                    @Override
-                    public void onStart() {
-                        Toast.makeText(DownloadActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
-                    }
+            public void onClick(View v) {
+                DLManager.getInstance().download(DownloadActivity.this,
+                        new DLManagerConfig.Builder()
+                                .downLoadUrl("http://ucdl.25pp.com/fs08/2017/01/20/2/2_87a290b5f041a8b512f0bc51595f839a.apk")
+                                .fileName("testApp.apk")
+                                .notificationTitle("大象投教")
+                                .notificationDesc("一个坑爹App")
+                                .queryInterval(800)
+                                .build()
+                        , new DLManager.DownLoadListener() {
+                            @Override
+                            public void onStart() {
+                                Toast.makeText(DownloadActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
+                            }
 
-                    @Override
-                    public void onProgressUpdate(int progress) {
-                        mPbUpdate.setProgress(progress);
-                        mTvProgress.setText(String.valueOf(progress) + "%");
-                    }
+                            @Override
+                            public void onProgressUpdate(int progress) {
+                                mPbUpdate.setProgress(progress);
+                                mTvProgress.setText(String.valueOf(progress) + "%");
+                            }
 
-                    @Override
-                    public void onComplete() {
-                        Toast.makeText(DownloadActivity.this, "完成", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                            @Override
+                            public void onComplete(File file) {
+                                Toast.makeText(DownloadActivity.this, "完成", Toast.LENGTH_SHORT).show();
+                            }
+                        });
             }
         });
     }

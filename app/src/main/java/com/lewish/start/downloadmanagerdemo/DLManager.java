@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 
+import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -22,11 +23,12 @@ import static android.content.Context.DOWNLOAD_SERVICE;
  * created at 2017/3/30 17:03
  */
 public class DLManager {
-    //常量
-    public static final String DOWNLOAD_URL = "http://ucdl.25pp.com/fs08/2017/01/20/2/2_87a290b5f041a8b512f0bc51595f839a.apk";
-    public static final String FILE_NAME = "testApp.apk";
-    public static final String NOTIFICATION_TITLE = "大象投教";
-    public static final String NOTIFICATION_DESC = "一个坑爹的app";
+
+    private String downloadUrl;
+    private String fileName;
+    private String notificationTitle;
+    private String notificationDesc;
+    private long queryInterval;
 
     private Context mContext;
     private DownloadManager mDownloadManager;
@@ -40,26 +42,27 @@ public class DLManager {
     private Handler mDeliveryHandler;
     private DownLoadListener mDownLoadListener;
 
-    private static class SingletonHolder{
+    private static class SingletonHolder {
         private static final DLManager INSTANCE = new DLManager();
     }
 
-    public static DLManager getInstance(){
+    public static DLManager getInstance() {
         return SingletonHolder.INSTANCE;
     }
 
-    public void initDLManager(Context context){
-        mContext = context.getApplicationContext();
-        mDeliveryHandler = new Handler(Looper.getMainLooper()){};
-        initDownloadManager();
-    }
-    private void initDownloadManager() {
+    private void initDownloadManager(DLManagerConfig dlManagerConfig) {
+        downloadUrl = dlManagerConfig.getDownloadUrl();
+        fileName = dlManagerConfig.getFileName();
+        notificationTitle = dlManagerConfig.getNotificationTitle();
+        notificationDesc = dlManagerConfig.getNotificationDesc();
+        queryInterval = dlManagerConfig.getQueryInterval();
+
         mDownloadManager = (DownloadManager) mContext.getSystemService(DOWNLOAD_SERVICE);
-        mDownloadManagerRequest = new DownloadManager.Request(Uri.parse(DOWNLOAD_URL));
+        mDownloadManagerRequest = new DownloadManager.Request(Uri.parse(downloadUrl));
 
         //设置Notification标题和描述
-        mDownloadManagerRequest.setTitle(NOTIFICATION_TITLE);
-        mDownloadManagerRequest.setDescription(NOTIFICATION_DESC);
+        mDownloadManagerRequest.setTitle(notificationTitle);
+        mDownloadManagerRequest.setDescription(notificationDesc);
         mDownloadManagerRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
         //指定网络下载类型
@@ -76,13 +79,13 @@ public class DLManager {
 
         //创建目录
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).mkdir();
-        mDownloadManagerRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, FILE_NAME);
+        mDownloadManagerRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
     }
 
     /**
      * 查询任务
      */
-    private static class QueryTask extends TimerTask{
+    private static class QueryTask extends TimerTask {
         private DownloadManager downloadManager;
         private long downloadID;
         private Handler deliveryHandler;
@@ -111,6 +114,7 @@ public class DLManager {
                     });
                     this.cancel();
                 }
+
                 String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
                 String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                 int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
@@ -120,7 +124,7 @@ public class DLManager {
                 deliveryHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if(downLoadListener!=null) {
+                        if (downLoadListener != null) {
                             downLoadListener.onProgressUpdate(pct);
                         }
                     }
@@ -131,50 +135,52 @@ public class DLManager {
         }
     }
 
-    public void download(DownLoadListener downLoadListener){
+    public void download(Context context,DLManagerConfig dlManagerConfig,DownLoadListener downLoadListener){
+        mContext = context.getApplicationContext();
+        mDeliveryHandler = new Handler(Looper.getMainLooper()) {};
+        initDownloadManager(dlManagerConfig);
         this.mDownLoadListener = downLoadListener;
-        if(mDownLoadListener!=null) {
-            mDownLoadListener.onStart();
-        }
+
         registBroadcastReceiver();
         mTimer = new Timer();
         mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
-        mQueryTask = new QueryTask(mDownloadManager,mDownLoadID,mDeliveryHandler,mDownLoadListener);
-        mTimer.schedule(mQueryTask, 0, 1000);
+        mQueryTask = new QueryTask(mDownloadManager, mDownLoadID, mDeliveryHandler, mDownLoadListener);
+        mTimer.schedule(mQueryTask, 0, queryInterval);
     }
 
     public class DownloadBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)) {
-//                mTimer.cancel();
-//                mTimer = null;
-//                mTimerTask.cancel();
-//                mTimerTask = null;
                 //下载完成
-                if(mDownLoadListener!=null) {
-                    mDownLoadListener.onComplete();
+                if (mDownLoadListener != null) {
+                    mDownLoadListener.onProgressUpdate(100);
+                    mDownLoadListener.onComplete(new File(getDownloadPath(mDownLoadID)));
                 }
                 unRegistBroadcastReceiver();
+                mTimer.cancel();
+                mQueryTask.cancel();
             }
         }
     }
 
-    public void registBroadcastReceiver(){
+    public void registBroadcastReceiver() {
         mDownloadBroadcastReceiver = new DownloadBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        mContext.registerReceiver(mDownloadBroadcastReceiver,intentFilter);
+        mContext.registerReceiver(mDownloadBroadcastReceiver, intentFilter);
     }
 
-    public void unRegistBroadcastReceiver(){
+    public void unRegistBroadcastReceiver() {
         mContext.unregisterReceiver(mDownloadBroadcastReceiver);
         mDownloadBroadcastReceiver = null;
     }
 
-    public interface DownLoadListener{
+    public interface DownLoadListener {
         public void onStart();
+
         public void onProgressUpdate(int progress);
-        public void onComplete();
+
+        public void onComplete(File file);
     }
 
     /**
@@ -198,6 +204,7 @@ public class DLManager {
 
     /**
      * 获取下载状态
+     *
      * @param downloadId an ID for the download, unique across the system.
      *                   This ID is used to make future calls related to this download.
      * @return int
