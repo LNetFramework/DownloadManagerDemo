@@ -124,9 +124,11 @@ public class DownloadActivity extends AppCompatActivity {
         mBtnStart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
-                mTimer.schedule(mTimerTask, 0, 1000);
-                mBtnStart.setClickable(false);
+//                mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
+//                mTimer.schedule(mTimerTask, 0, 1000);
+//                mBtnStart.setClickable(false);
+                DLManager.getInstance().initDLManager(DownloadActivity.this);
+                DLManager.getInstance().download();
             }
         });
     }
