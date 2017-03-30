@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.support.annotation.NonNull;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -31,9 +32,11 @@ public class DLManager {
     private DownloadManager mDownloadManager;
     private DownloadManager.Request mDownloadManagerRequest;
     private DownloadBroadcastReceiver mDownloadBroadcastReceiver;
+
     private long mDownLoadID;
+
     private Timer mTimer;
-    private TimerTask mTimerTask;
+    private QueryTask mQueryTask;
     private Handler mDeliveryHandler;
     private DownLoadListener mDownLoadListener;
 
@@ -63,7 +66,7 @@ public class DLManager {
         //指定在WIFI状态下，执行下载操作。
         mDownloadManagerRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
         //指定在MOBILE状态下，执行下载操作
-//        mDownloadManagerRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE);
+        //mDownloadManagerRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE);
         //是否允许漫游状态下，执行下载操作
         mDownloadManagerRequest.setAllowedOverRoaming(true);
         //是否允许“计量式的网络连接”执行下载操作
@@ -74,42 +77,58 @@ public class DLManager {
         //创建目录
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).mkdir();
         mDownloadManagerRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, FILE_NAME);
+    }
 
-        final DownloadManager.Query query = new DownloadManager.Query();
-        mTimer = new Timer();
-        mTimerTask = new TimerTask() {
-            public void run() {
-                Cursor cursor = mDownloadManager.query(query.setFilterById(mDownLoadID));
-                if (cursor != null && cursor.moveToFirst()) {
-                    if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
+    /**
+     * 查询任务
+     */
+    private static class QueryTask extends TimerTask{
+        private DownloadManager downloadManager;
+        private long downloadID;
+        private Handler deliveryHandler;
+        private DownLoadListener downLoadListener;
+        private DownloadManager.Query query;
+
+        private QueryTask(@NonNull DownloadManager downloadManager, long downloadID, @NonNull Handler deliveryHandler, @NonNull DownLoadListener downLoadListener) {
+            this.downloadManager = downloadManager;
+            this.downloadID = downloadID;
+            this.deliveryHandler = deliveryHandler;
+            this.downLoadListener = downLoadListener;
+            query = new DownloadManager.Query();
+        }
+
+        @Override
+        public void run() {
+            Cursor cursor = downloadManager.query(query.setFilterById(downloadID));
+            if (cursor != null && cursor.moveToFirst()) {
+                if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
 //                        install(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/"+FILE_NAME);
-                        mDeliveryHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                mDownLoadListener.onProgressUpdate(100);
-                            }
-                        });
-                        mTimerTask.cancel();
-                    }
-                    String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
-                    String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
-                    int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
-                    int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                    final int pct = (bytes_downloaded * 100) / bytes_total;
-
-                    mDeliveryHandler.post(new Runnable() {
+                    deliveryHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            if(mDownLoadListener!=null) {
-                                mDownLoadListener.onProgressUpdate(pct);
-                            }
+                            downLoadListener.onProgressUpdate(100);
                         }
                     });
-
+                    this.cancel();
                 }
-                cursor.close();
+                String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
+                String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                final int pct = (bytes_downloaded * 100) / bytes_total;
+
+                deliveryHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if(downLoadListener!=null) {
+                            downLoadListener.onProgressUpdate(pct);
+                        }
+                    }
+                });
+
             }
-        };
+            cursor.close();
+        }
     }
 
     public void download(DownLoadListener downLoadListener){
@@ -118,8 +137,10 @@ public class DLManager {
             mDownLoadListener.onStart();
         }
         registBroadcastReceiver();
+        mTimer = new Timer();
         mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
-        mTimer.schedule(mTimerTask, 0, 1000);
+        mQueryTask = new QueryTask(mDownloadManager,mDownLoadID,mDeliveryHandler,mDownLoadListener);
+        mTimer.schedule(mQueryTask, 0, 1000);
     }
 
     public class DownloadBroadcastReceiver extends BroadcastReceiver {

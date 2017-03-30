@@ -25,6 +25,7 @@ public class DownloadActivity extends AppCompatActivity {
         initViews();
     }
 
+
     private void initViews() {
         mTvFileName = (TextView) findViewById(R.id.mTvFileName);
         mTvProgress = (TextView) findViewById(R.id.mTvProgress);
