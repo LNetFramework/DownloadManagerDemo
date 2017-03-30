@@ -128,7 +128,24 @@ public class DownloadActivity extends AppCompatActivity {
 //                mTimer.schedule(mTimerTask, 0, 1000);
 //                mBtnStart.setClickable(false);
                 DLManager.getInstance().initDLManager(DownloadActivity.this);
-                DLManager.getInstance().download();
+                DLManager.getInstance().download(new DLManager.DownLoadListener() {
+                    @Override
+                    public void onStart() {
+                        Toast.makeText(DownloadActivity.this, "开始下载", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onProgressUpdate(int progress) {
+                        if(progress%10==0) {
+                            Toast.makeText(DownloadActivity.this, ""+progress, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Toast.makeText(DownloadActivity.this, "完成", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         });
     }

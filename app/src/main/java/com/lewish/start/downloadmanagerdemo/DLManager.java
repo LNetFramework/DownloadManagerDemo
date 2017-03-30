@@ -5,8 +5,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static android.content.Context.DOWNLOAD_SERVICE;
 
@@ -26,6 +32,10 @@ public class DLManager {
     private DownloadManager.Request mDownloadManagerRequest;
     private DownloadBroadcastReceiver mDownloadBroadcastReceiver;
     private long mDownLoadID;
+    private Timer mTimer;
+    private TimerTask mTimerTask;
+    private Handler mDeliveryHandler;
+    private DownLoadListener mDownLoadListener;
 
     private static class SingletonHolder{
         private static final DLManager INSTANCE = new DLManager();
@@ -37,6 +47,7 @@ public class DLManager {
 
     public void initDLManager(Context context){
         mContext = context.getApplicationContext();
+        mDeliveryHandler = new Handler(Looper.getMainLooper()){};
         initDownloadManager();
     }
     private void initDownloadManager() {
@@ -65,18 +76,56 @@ public class DLManager {
         mDownloadManagerRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, FILE_NAME);
 
         final DownloadManager.Query query = new DownloadManager.Query();
+        mTimer = new Timer();
+        mTimerTask = new TimerTask() {
+            public void run() {
+                Cursor cursor = mDownloadManager.query(query.setFilterById(mDownLoadID));
+                if (cursor != null && cursor.moveToFirst()) {
+                    if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
+//                        install(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/"+FILE_NAME);
+                        mTimerTask.cancel();
+                    }
+                    String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
+                    String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                    int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                    final int pct = (bytes_downloaded * 100) / bytes_total;
+
+                    mDeliveryHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(mDownLoadListener!=null) {
+                                mDownLoadListener.onProgressUpdate(pct);
+                            }
+                        }
+                    });
+
+                }
+                cursor.close();
+            }
+        };
     }
 
-    public void download(){
+    public void download(DownLoadListener downLoadListener){
+        this.mDownLoadListener = downLoadListener;
+        if(mDownLoadListener!=null) {
+            mDownLoadListener.onStart();
+        }
         registBroadcastReceiver();
         mDownLoadID = mDownloadManager.enqueue(mDownloadManagerRequest);
+        mTimer.schedule(mTimerTask, 0, 1000);
     }
 
     public class DownloadBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)) {
+                mTimer.cancel();
+                mTimer = null;
                 //下载完成
+                if(mDownLoadListener!=null) {
+                    mDownLoadListener.onComplete();
+                }
                 unRegistBroadcastReceiver();
             }
         }
@@ -91,6 +140,58 @@ public class DLManager {
     public void unRegistBroadcastReceiver(){
         mContext.unregisterReceiver(mDownloadBroadcastReceiver);
         mDownloadBroadcastReceiver = null;
+    }
+
+    public interface DownLoadListener{
+        public void onStart();
+        public void onProgressUpdate(int progress);
+        public void onComplete();
+    }
+
+    /**
+     * 获取文件保存的路径
+     */
+    public String getDownloadPath(long downloadId) {
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        Cursor c = mDownloadManager.query(query);
+        if (c != null) {
+            try {
+                if (c.moveToFirst()) {
+                    return c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
+                }
+            } finally {
+                c.close();
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * 获取下载状态
+     * @param downloadId an ID for the download, unique across the system.
+     *                   This ID is used to make future calls related to this download.
+     * @return int
+     * @see DownloadManager#STATUS_PENDING
+     * @see DownloadManager#STATUS_PAUSED
+     * @see DownloadManager#STATUS_RUNNING
+     * @see DownloadManager#STATUS_SUCCESSFUL
+     * @see DownloadManager#STATUS_FAILED
+     */
+    public int getDownloadStatus(long downloadId) {
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        Cursor c = mDownloadManager.query(query);
+        if (c != null) {
+            try {
+                if (c.moveToFirst()) {
+                    return c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+
+                }
+            } finally {
+                c.close();
+            }
+        }
+        return -1;
     }
 
 }
