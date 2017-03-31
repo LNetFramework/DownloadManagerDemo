@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
@@ -13,6 +15,8 @@ import android.os.Looper;
 import android.support.annotation.NonNull;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -60,6 +64,14 @@ public class DLManager {
         mDownloadManager = (DownloadManager) mContext.getSystemService(DOWNLOAD_SERVICE);
         mDownloadManagerRequest = new DownloadManager.Request(Uri.parse(downloadUrl));
 
+        //添加请求头
+        HashMap<String, String> downLoadRequestHeaders = dlManagerConfig.getDownLoadRequestHeaders();
+        if(downLoadRequestHeaders!=null&&downLoadRequestHeaders.isEmpty()) {
+            for (Map.Entry<String,String> downLoadRequestHeader : downLoadRequestHeaders.entrySet()) {
+                mDownloadManagerRequest.addRequestHeader(downLoadRequestHeader.getKey(),downLoadRequestHeader.getValue());
+            }
+        }
+        
         //设置Notification标题和描述
         mDownloadManagerRequest.setTitle(notificationTitle);
         mDownloadManagerRequest.setDescription(notificationDesc);
@@ -104,8 +116,8 @@ public class DLManager {
         public void run() {
             Cursor cursor = downloadManager.query(query.setFilterById(downloadID));
             if (cursor != null && cursor.moveToFirst()) {
-                String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
-                String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+//                String title = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_TITLE));
+//                String address = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                 int bytes_downloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                 int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
                 final int pct = (bytes_downloaded * 100) / bytes_total;
@@ -217,6 +229,32 @@ public class DLManager {
             }
         }
         return -1;
+    }
+
+
+    /**
+     * 下载的apk和当前程序版本比较
+     *
+     * @param apkInfo apk file's packageInfo
+     * @param context Context
+     * @return 如果当前应用版本小于apk的版本则返回true
+     */
+    private static boolean compare(PackageInfo apkInfo, Context context) {
+        if (apkInfo == null) {
+            return false;
+        }
+        String localPackage = context.getPackageName();
+        if (apkInfo.packageName.equals(localPackage)) {
+            try {
+                PackageInfo packageInfo = context.getPackageManager().getPackageInfo(localPackage, 0);
+                if (apkInfo.versionCode > packageInfo.versionCode) {
+                    return true;
+                }
+            } catch (PackageManager.NameNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+        return false;
     }
 
 }

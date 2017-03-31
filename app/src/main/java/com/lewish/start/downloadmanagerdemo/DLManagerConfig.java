@@ -1,5 +1,7 @@
 package com.lewish.start.downloadmanagerdemo;
 
+import java.util.HashMap;
+
 /**
  * author: sundong
  * created at 2017/3/30 22:03
@@ -14,44 +16,30 @@ public class DLManagerConfig {
     private String notificationDesc;
     private long queryInterval = DEFAULT_QUERY_INTERVAL;
 
+    private HashMap<String,String> downLoadRequestHeaders = new HashMap<>();
+
     public String getDownloadUrl() {
         return downloadUrl;
-    }
-
-    public void setDownloadUrl(String downloadUrl) {
-        this.downloadUrl = downloadUrl;
     }
 
     public String getFileName() {
         return fileName;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
-    }
-
     public String getNotificationTitle() {
         return notificationTitle;
-    }
-
-    public void setNotificationTitle(String notificationTitle) {
-        this.notificationTitle = notificationTitle;
     }
 
     public String getNotificationDesc() {
         return notificationDesc;
     }
 
-    public void setNotificationDesc(String notificationDesc) {
-        this.notificationDesc = notificationDesc;
-    }
-
     public long getQueryInterval() {
         return queryInterval;
     }
 
-    public void setQueryInterval(long queryInterval) {
-        this.queryInterval = queryInterval;
+    public HashMap<String, String> getDownLoadRequestHeaders() {
+        return downLoadRequestHeaders;
     }
 
     public static class Builder {
@@ -83,6 +71,11 @@ public class DLManagerConfig {
 
         public Builder queryInterval(long queryInterval){
             dlManagerConfig.queryInterval = queryInterval;
+            return this;
+        }
+
+        public Builder requestHeader(String header,String value){
+            dlManagerConfig.downLoadRequestHeaders.put(header,value);
             return this;
         }
 
